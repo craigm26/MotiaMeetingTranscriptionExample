@@ -1,0 +1,72 @@
+id: invoice-ocr-processor
+namespace: motia.examples
+name: Invoice OCR Processor
+description: >
+  Processes invoice images and PDFs using Mistral OCR, extracts structured data,
+  and outputs results as CSV.
+
+steps:
+  - name: ListDocuments
+    uses: local/fs-list
+    with:
+      path: ./inputs/
+      extensions: [pdf, jpg, jpeg, png]
+
+  - name: RunOCR
+    uses: local/python
+    with:
+      script: ./scripts/run_mistral_ocr.py
+      args: ${{ steps.ListDocuments.files }}
+    condition: ${{ steps.ListDocuments.files | length > 0 }}
+
+  - name: ParseFields
+    uses: motia/langchain-parse
+    with:
+      input_text: ${{ steps.RunOCR.texts }}
+      schema:
+        - field: date
+          type: date
+          description: "Invoice date"
+        - field: total_amount
+          type: money
+          description: "Total invoice amount"
+        - field: vendor_name
+          type: string
+          description: "Vendor or company name"
+        - field: invoice_number
+          type: string
+          description: "Invoice number or ID"
+        - field: currency
+          type: string
+          description: "Currency code (USD, EUR, etc.)"
+    condition: ${{ steps.RunOCR.texts | length > 0 }}
+
+  - name: SaveCSV
+    uses: local/csv-write
+    with:
+      data: ${{ steps.ParseFields.results }}
+      output: ./outputs/invoice_data.csv
+      columns:
+        - filename
+        - date
+        - total_amount
+        - vendor_name
+        - invoice_number
+        - currency
+        - raw_text
+    condition: ${{ steps.ParseFields.results | length > 0 }}
+
+  - name: GenerateSummary
+    uses: local/python
+    with:
+      script: ./scripts/generate_invoice_summary.py
+      args: 
+        - ${{ steps.SaveCSV.output }}
+        - ./outputs/invoice_summary.html
+    condition: ${{ steps.SaveCSV.output != null }}
+
+outputs:
+  csv_file: ${{ steps.SaveCSV.output }}
+  summary_file: ${{ steps.GenerateSummary.output }}
+  processed_files: ${{ steps.ListDocuments.files | length }}
+  success_count: ${{ steps.RunOCR.texts | length }} 

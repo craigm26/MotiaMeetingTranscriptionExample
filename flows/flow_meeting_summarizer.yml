@@ -1,0 +1,60 @@
+name: Meeting Transcripts Summarizer
+description: >
+  Transcribes local meeting audio files using Whisper, summarizes content,
+  and extracts action items. Outputs structured CSV results.
+
+steps:
+  - name: ListAudio
+    uses: local/fs-list
+    with:
+      path: ./inputs/audio_inputs/
+      extensions: [mp3, wav, m4a]
+
+  - name: Transcribe
+    uses: local/python
+    with:
+      script: ./scripts/transcribe_whisper.py
+      args: ${{ steps.ListAudio.files }}
+    condition: ${{ steps.ListAudio.files | length > 0 }}
+
+  - name: Summarize
+    uses: motia/langchain-summarize
+    with:
+      input_text: ${{ steps.Transcribe.texts }}
+      instructions: >
+        Summarize the meeting transcript and extract key points.
+        Focus on:
+        - Main topics discussed
+        - Decisions made
+        - Action items and assignments
+        - Important deadlines
+        - Follow-up tasks
+    condition: ${{ steps.Transcribe.texts | length > 0 }}
+
+  - name: SaveCSV
+    uses: local/csv-write
+    with:
+      data: ${{ steps.Summarize.summaries }}
+      output: ./outputs/meeting_summaries.csv
+      columns:
+        - filename
+        - summary
+        - action_items
+        - duration
+        - transcript
+    condition: ${{ steps.Summarize.summaries | length > 0 }}
+
+  - name: GenerateReport
+    uses: local/python
+    with:
+      script: ./scripts/generate_report.py
+      args: 
+        - ${{ steps.SaveCSV.output }}
+        - ./outputs/meeting_report.html
+    condition: ${{ steps.SaveCSV.output != null }}
+
+outputs:
+  csv_file: ${{ steps.SaveCSV.output }}
+  report_file: ${{ steps.GenerateReport.output }}
+  processed_files: ${{ steps.ListAudio.files | length }}
+  success_count: ${{ steps.Transcribe.texts | length }} 
