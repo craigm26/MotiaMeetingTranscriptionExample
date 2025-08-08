@@ -52,51 +52,33 @@ export const config: EventConfig = {
   flows: ['meeting-transcription'],
 }
 
-export const handler: Handlers['MeetingTranscriptionProcessor'] = async (input, { traceId, logger, emit, streams }) => {
-  logger.info('Starting meeting transcription processing', { input })
-
+export const handler: Handlers['MeetingTranscriptionProcessor'] = async (context) => {
+  const { filename, language = 'en', model = 'whisper-large-v3', localWhisperPath } = context.body
+  const traceId = context.traceId
+  
   try {
-    // Update stream with transcription start
-    await streams.meetingTranscription.set(traceId, input.transcriptionId, {
+    // Stream initial status
+    await context.streams.meetingTranscription.add({
       status: 'transcribing',
-      progress: 10,
-      filename: input.filename,
-      localWhisperStatus: 'initializing',
-      whisperModel: input.model,
-      timestamp: new Date().toISOString()
+      progress: 0,
+      filename,
+      timestamp: new Date().toISOString(),
+      localWhisperStatus: 'Starting Whisper processing...',
+      whisperModel: model
     })
 
-    /**
-     * Simulate transcription process with progress updates
-     * In a real implementation, this would:
-     * 1. Call the local Whisper API
-     * 2. Process the audio file
-     * 3. Generate the transcript
-     * 4. Extract metadata (duration, participants, etc.)
-     */
-    const transcriptionSteps = [
-      { progress: 20, message: 'Loading Whisper model', whisperStatus: 'loading_model' },
-      { progress: 40, message: 'Processing audio file', whisperStatus: 'processing_audio' },
-      { progress: 60, message: 'Generating transcript', whisperStatus: 'generating_transcript' },
-      { progress: 80, message: 'Post-processing results', whisperStatus: 'post_processing' },
-      { progress: 90, message: 'Finalizing transcription', whisperStatus: 'finalizing' }
-    ]
-
-    const startTime = Date.now()
-
-    // Simulate processing steps with delays
-    for (const step of transcriptionSteps) {
-      // In real implementation, this would be actual processing time
-      await new Promise(resolve => setTimeout(resolve, 1000))
+    // Simulate progress updates during transcription
+    const progressUpdates = [10, 25, 40, 60, 80, 95]
+    for (const progress of progressUpdates) {
+      await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second intervals
       
-      // Update stream with current progress
-      await streams.meetingTranscription.set(traceId, input.transcriptionId, {
+      await context.streams.meetingTranscription.add({
         status: 'transcribing',
-        progress: step.progress,
-        filename: input.filename,
-        localWhisperStatus: step.whisperStatus,
-        whisperModel: input.model,
-        timestamp: new Date().toISOString()
+        progress,
+        filename,
+        timestamp: new Date().toISOString(),
+        localWhisperStatus: `Processing audio... ${progress}% complete`,
+        whisperModel: model
       })
     }
 
@@ -104,7 +86,7 @@ export const handler: Handlers['MeetingTranscriptionProcessor'] = async (input, 
      * Simulate transcription results
      * In a real implementation, this would come from the Whisper API
      */
-    const mockTranscript = `This is a simulated transcript for ${input.filename}. 
+    const mockTranscript = `This is a simulated transcript for ${filename}. 
     In a real implementation, this would be the actual transcription from the Whisper API.
     The transcript would include all spoken content with proper punctuation and formatting.`
 
@@ -116,29 +98,29 @@ export const handler: Handlers['MeetingTranscriptionProcessor'] = async (input, 
       'Update documentation'
     ]
 
-    const processingTime = Date.now() - startTime
+    const startTime = Date.now()
 
-    // Update stream with completion
-    await streams.meetingTranscription.set(traceId, input.transcriptionId, {
+    // Final completion status
+    await context.streams.meetingTranscription.add({
       status: 'completed',
       progress: 100,
-      filename: input.filename,
+      filename,
+      transcript: mockTranscript, // Your actual transcript
+      timestamp: new Date().toISOString(),
+      localWhisperStatus: 'Transcription completed!',
+      whisperModel: model,
       duration: mockDuration,
-      transcript: mockTranscript,
       participants: mockParticipants,
       actionItems: mockActionItems,
-      localWhisperStatus: 'completed',
-      whisperModel: input.model,
-      processingTime,
-      timestamp: new Date().toISOString()
+      processingTime: Date.now() - startTime
     })
 
     logger.info('Meeting transcription completed successfully', { 
-      filename: input.filename,
-      transcriptionId: input.transcriptionId,
+      filename: filename,
+      transcriptionId: context.body.transcriptionId,
       duration: mockDuration,
       processingTime,
-      whisperModel: input.model
+      whisperModel: model
     })
 
     /**
@@ -146,52 +128,30 @@ export const handler: Handlers['MeetingTranscriptionProcessor'] = async (input, 
      * This can be picked up by other steps for further processing
      * (e.g., analysis, storage, notification)
      */
-    await emit({
+    await context.emit({
       topic: 'transcription-completed',
       data: { 
-        filename: input.filename,
-        transcriptionId: input.transcriptionId,
+        filename: filename,
+        transcriptionId: context.body.transcriptionId,
         duration: mockDuration,
         transcript: mockTranscript,
         participants: mockParticipants,
         actionItems: mockActionItems,
         processingTime,
-        whisperModel: input.model,
+        whisperModel: model,
         timestamp: new Date().toISOString()
       }
     })
 
   } catch (error) {
-    logger.error('Meeting transcription failed', { 
-      error: error instanceof Error ? error.message : String(error),
-      filename: input.filename,
-      transcriptionId: input.transcriptionId
-    })
-
-    // Update stream with error status
-    await streams.meetingTranscription.set(traceId, input.transcriptionId, {
+    await context.streams.meetingTranscription.add({
       status: 'failed',
       progress: 0,
-      filename: input.filename,
-      error: error instanceof Error ? error.message : String(error),
-      localWhisperStatus: 'failed',
-      whisperModel: input.model,
-      timestamp: new Date().toISOString()
+      filename,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      localWhisperStatus: 'Processing failed'
     })
-
-    /**
-     * Emit failure event
-     * This can be picked up by error handling steps
-     */
-    await emit({
-      topic: 'transcription-failed',
-      data: { 
-        filename: input.filename,
-        transcriptionId: input.transcriptionId,
-        error: error instanceof Error ? error.message : String(error),
-        whisperModel: input.model,
-        timestamp: new Date().toISOString()
-      }
-    })
+    throw error
   }
 } 

@@ -81,16 +81,16 @@
   {
     "id": "meeting-transcription",
     "config": {
+      "steps/meeting-transcription-processor.step.ts": {
+        "x": 0,
+        "y": 284
+      },
       "steps/meeting-transcription-api.step.ts": {
         "x": 0,
         "y": 0
       },
-      "steps/meeting-transcription-processor.step.ts": {
-        "x": 0,
-        "y": 0
-      },
       "steps/hello-world.step.js": {
-        "x": 0,
+        "x": 410,
         "y": 0
       }
     }
