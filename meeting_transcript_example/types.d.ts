@@ -8,7 +8,7 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    'meetingTranscription': MotiaStream<{ status: 'uploading' | 'transcribing' | 'processing' | 'completed' | 'failed'; progress: number; filename: string; duration?: number; transcript?: string; summary?: string; actionItems?: string[]; participants?: string[]; error?: string; timestamp: string; localWhisperStatus?: string; whisperModel?: string; processingTime?: number }>
+    'meetingTranscription': MotiaStream<{ status: 'uploading' | 'transcribing' | 'processing' | 'completed' | 'failed'; progress: number; filename: string; duration?: number; transcript?: string; participants?: string[]; error?: string; summary?: string; actionItems?: string[]; keyTopics?: string[]; decisions?: string[]; sentimentAnalysis?: { overall: 'positive' | 'negative' | 'neutral'; confidence: number; positiveIndicators: number; negativeIndicators: number; energyLevel: 'high' | 'medium' | 'low' }; insights?: { participationScore: number; engagementLevel: 'high' | 'medium' | 'low'; meetingEfficiency: 'high' | 'medium' | 'low'; followUpNeeded: boolean; keyMetrics: { wordCount: number; estimatedSpeakingRate: number; participantCount: number } }; timestamp: string; localWhisperStatus?: string; whisperModel?: string; processingTime?: number }>
   }
 
   interface Handlers {
